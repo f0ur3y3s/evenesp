@@ -13,7 +13,13 @@
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
 
+// custom headers
+#include "led.h"
+
 #define BLE_TAG "ble"
-esp_err_t ble_init (void);
+
+esp_err_t ble_init (pixel_t * p_pixel);
+void      ble_host_config_init (void);
+void      ble_host_task (void * p_param);
 
 #endif // EVEN_BLE_H

@@ -1,7 +1,7 @@
 #include "main.h"
 
-led_strip_handle_t gh_led_strip = { 0 };
-hsv_t              g_hsv        = { 0, 255, 10 };
+pixel_t g_pixel = { 0 };
+hsv_t   g_hsv   = { 0, 255, 10 };
 
 void app_main (void)
 {
@@ -19,23 +19,27 @@ void app_main (void)
         }
     }
 
-    if (ESP_OK != ble_init())
+    led_init(&g_pixel);
+
+    if (ESP_OK != ble_init(&g_pixel))
     {
         ESP_LOGE(MAIN_TAG, "Failed to initialize BLE stack");
-        goto ERASE_NVS_EXIT;
+        // goto ERASE_NVS_EXIT;
+        goto EXIT;
     }
 
-    led_configure(&gh_led_strip);
+    ble_host_config_init();
 
-    for (;;)
-    {
-        led_set_hsv(gh_led_strip, &g_hsv);
-        vTaskDelay(pdMS_TO_TICKS(50));
-        g_hsv.hue += 5;
-    }
+    xTaskCreate(ble_host_task, "ble_host_task", 4096, NULL, 10, NULL);
+    // for (;;)
+    // {
+    //     // led_set_hsv(g_pixel.p_led_strip, &g_hsv);
+    //     // vTaskDelay(pdMS_TO_TICKS(50));
+    //     // g_hsv.hue += 5;
+    // }
 
-ERASE_NVS_EXIT:
-    nvs_flash_erase();
+// ERASE_NVS_EXIT:
+//     nvs_flash_erase();
 EXIT:
     return;
 }

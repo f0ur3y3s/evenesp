@@ -3,11 +3,18 @@
 
 #include <stdint.h>
 #include "led_strip.h"
+#include "esp_log.h"
 
 // Defaults for onboard neopixel
 #define LED_STRIP_GPIO 48
 #define LED_STRIP_NUM  1
 #define MAX_HUE        360
+#define LED_TAG        "LED"
+
+// Event Group bits
+#define BLE_SCANNING   BIT0
+#define BLE_CONNECTING BIT1
+#define BLE_CONNECTED  BIT2
 
 typedef struct hsv_t
 {
@@ -15,6 +22,12 @@ typedef struct hsv_t
     uint8_t  saturation;
     uint8_t  value;
 } hsv_t;
+
+typedef struct pixel_t
+{
+    EventGroupHandle_t p_ble_event_group;
+    led_strip_handle_t p_led_strip;
+} pixel_t;
 
 static inline esp_err_t led_set_hsv (led_strip_handle_t h_led_strip, hsv_t * p_hsv)
 {
@@ -41,6 +54,6 @@ EXIT:
     return status;
 }
 
-void led_configure (led_strip_handle_t * pp_led_strip);
+void led_init (pixel_t * p_pixel);
 
 #endif // EVEN_LED_H
