@@ -8,6 +8,7 @@
 /* NimBLE stack APIs */
 #include "host/ble_hs.h"
 #include "host/ble_uuid.h"
+#include "host/ble_gap.h"
 #include "host/util/util.h"
 #include "nimble/ble.h"
 #include "nimble/nimble_port.h"
@@ -18,7 +19,9 @@
 
 #define BLE_TAG "ble"
 // TODO: Change this to name of devices
-#define TARGET_DEVICE_NAME "NimBLE_CONN"
+// #define TARGET_DEVICE_NAME "NimBLE_CONN"
+#define LEFT_LENS  "Even G1_1_L_"
+#define RIGHT_LENS "Even G1_1_R_"
 
 /**
  * @brief Initilizes the BLE stack with NimBLE host

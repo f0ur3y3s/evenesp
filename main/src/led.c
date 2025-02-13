@@ -3,9 +3,9 @@
 pixel_t      g_pixel = { .is_initialized    = false,
                          .p_ble_event_group = NULL,
                          .p_led_strip       = NULL };
-static hsv_t g_green = { 120, 255, 10 };
-static hsv_t g_blue  = { 240, 255, 10 };
-static hsv_t g_red   = { 0, 255, 10 };
+static hsv_t g_green = { 120, 255, 1 };
+static hsv_t g_blue  = { 240, 255, 1 };
+static hsv_t g_red   = { 0, 255, 1 };
 
 void led_task (void * p_param)
 {

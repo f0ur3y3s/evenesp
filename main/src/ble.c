@@ -18,7 +18,8 @@ static const struct ble_gap_disc_params g_scan_params = {
     .passive       = 0 //
 };
 
-static bool g_is_connecting = false;
+static bool    g_is_connecting = false;
+static uint8_t g_own_addr_type = 0;
 
 esp_err_t ble_init (void)
 {
@@ -64,7 +65,9 @@ static void ble_on_stack_sync (void)
     ESP_LOGI(BLE_TAG, "BLE stack synchronized, starting scan...");
     xEventGroupClearBits(g_pixel.p_ble_event_group, BLE_ALL);
     xEventGroupSetBits(g_pixel.p_ble_event_group, BLE_SCANNING);
-    int status = ble_gap_disc(BLE_OWN_ADDR_PUBLIC,
+    ble_hs_id_infer_auto(0, &g_own_addr_type);
+
+    int status = ble_gap_disc(g_own_addr_type,
                               BLE_HS_FOREVER,
                               &g_scan_params,
                               ble_gap_event,
@@ -89,6 +92,7 @@ static int ble_gap_event (struct ble_gap_event * p_event, void * p_arg)
                 return 0;
             }
 
+            // TODO: figure out a better way to parse advertisement data
             struct ble_hs_adv_fields fields = { 0 };
             int                      status = ble_hs_adv_parse_fields(&fields,
                                                  p_event->disc.data,
@@ -107,18 +111,16 @@ static int ble_gap_event (struct ble_gap_event * p_event, void * p_arg)
                 return 0;
             }
 
-            if (strnstr((char *)fields.name,
-                        TARGET_DEVICE_NAME,
-                        fields.name_len))
+            if (NULL
+                != strnstr((char *)fields.name, LEFT_LENS, fields.name_len))
             {
                 ESP_LOGI(BLE_TAG,
                          "Discovered device: %.*s",
                          fields.name_len,
                          fields.name);
 
-                g_is_connecting = true; // Set connecting flag
+                g_is_connecting = true;
                 ble_gap_disc_cancel();
-                // clear all bits (portmax will be 16 or 32)
                 xEventGroupClearBits(g_pixel.p_ble_event_group, BLE_ALL);
                 xEventGroupSetBits(g_pixel.p_ble_event_group, BLE_CONNECTING);
 
@@ -132,7 +134,8 @@ static int ble_gap_event (struct ble_gap_event * p_event, void * p_arg)
                         .min_ce_len          = 0x10,
                         .max_ce_len          = 0x20 };
 
-                status = ble_gap_connect(p_event->disc.addr.type,
+                // status = ble_gap_connect(p_event->disc.addr.type,
+                status = ble_gap_connect(g_own_addr_type,
                                          &p_event->disc.addr,
                                          10000,
                                          &conn_params,
@@ -145,6 +148,11 @@ static int ble_gap_event (struct ble_gap_event * p_event, void * p_arg)
                              "Failed to connect to device, error code: %d",
                              status);
                     g_is_connecting = false;
+                    ble_gap_disc(g_own_addr_type,
+                                 BLE_HS_FOREVER,
+                                 &g_scan_params,
+                                 ble_gap_event,
+                                 NULL);
                 }
             }
         }
@@ -163,7 +171,6 @@ static int ble_gap_event (struct ble_gap_event * p_event, void * p_arg)
             if (0 == (p_event->connect).status)
             {
                 ESP_LOGI(BLE_TAG, "Successfully connected!");
-                // clear all bits (portmax will be 16 or 32)
                 xEventGroupClearBits(g_pixel.p_ble_event_group, BLE_ALL);
                 xEventGroupSetBits(g_pixel.p_ble_event_group, BLE_CONNECTED);
             }
@@ -172,7 +179,7 @@ static int ble_gap_event (struct ble_gap_event * p_event, void * p_arg)
                 ESP_LOGE(BLE_TAG,
                          "Connection failed, error: %d",
                          (p_event->connect).status);
-                ble_gap_disc(BLE_OWN_ADDR_PUBLIC,
+                ble_gap_disc(g_own_addr_type,
                              BLE_HS_FOREVER,
                              &g_scan_params,
                              ble_gap_event,
@@ -185,10 +192,9 @@ static int ble_gap_event (struct ble_gap_event * p_event, void * p_arg)
             ESP_LOGI(BLE_TAG,
                      "disconnected, reason=%d",
                      p_event->disconnect.reason);
-            // clear all bits (portmax will be 16 or 32)
             xEventGroupClearBits(g_pixel.p_ble_event_group, BLE_ALL);
             xEventGroupSetBits(g_pixel.p_ble_event_group, BLE_SCANNING);
-            ble_gap_disc(BLE_OWN_ADDR_PUBLIC,
+            ble_gap_disc(g_own_addr_type,
                          BLE_HS_FOREVER,
                          &g_scan_params,
                          ble_gap_event,

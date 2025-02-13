@@ -1,5 +1,9 @@
-# EvenESP
+# EvenESP Coex
 
+A single ESP32S3 controller using BLE and WiFi STA coexistence.
+
+
+# EvenESP Dual
 A dual ESP32S3 controller for the Even Realities G1 glasses written in C with ESP-IDF.
 
 One (1) ESP32S3 will handle the BLE communication with the Even Realities G1 glasses, while the other (1) ESP32S3 will handle the WiFi communication with the internet.
