@@ -16,8 +16,8 @@
 // custom headers
 #include "led.h"
 
-#define BLE_TAG "ble"
-
+#define BLE_TAG            "ble"
+#define TARGET_DEVICE_NAME "NimBLE_CONN"
 esp_err_t ble_init (pixel_t * p_pixel);
 void      ble_host_config_init (void);
 void      ble_host_task (void * p_param);
