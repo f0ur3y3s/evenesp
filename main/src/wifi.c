@@ -45,39 +45,6 @@ void wifi_init (void)
     ESP_LOGI(WIFI_TAG, "Wi-Fi initialized in STA mode.");
 }
 
-// static void wifi_event_handler (void *           p_arg,
-//                                 esp_event_base_t event_base,
-//                                 int32_t          event_id,
-//                                 void *           p_event_data)
-// {
-//     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
-//     {
-//         uint8_t mac[6] = { 0 };
-//         esp_wifi_get_mac(WIFI_IF_STA, mac);
-//         ESP_LOGI(WIFI_TAG,
-//                  "Wi-Fi started. MAC: %02X:%02X:%02X:%02X:%02X:%02X",
-//                  mac[0],
-//                  mac[1],
-//                  mac[2],
-//                  mac[3],
-//                  mac[4],
-//                  mac[5]);
-//         esp_wifi_connect();
-//     }
-//     else if (event_base == WIFI_EVENT
-//              && event_id == WIFI_EVENT_STA_DISCONNECTED)
-//     {
-//         esp_wifi_connect();
-//         ESP_LOGI(WIFI_TAG, "Reconnecting to Wi-Fi...");
-//     }
-//     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
-//     {
-//         ip_event_got_ip_t * event = (ip_event_got_ip_t *)p_event_data;
-//         ESP_LOGI(WIFI_TAG, "Got IP: " IPSTR, IP2STR(&event->ip_info.ip));
-//         xEventGroupSetBits(gh_wifi_egroup, INTERNAL_WIFI_CONNECTED_BIT);
-//     }
-// }
-
 static void wifi_event_handler (void *           p_arg,
                                 esp_event_base_t event_base,
                                 int32_t          event_id,
@@ -99,6 +66,7 @@ static void wifi_event_handler (void *           p_arg,
                      "NOT IMPLEMENTED Wi-Fi event: %" PRIi32,
                      event_id);
         }
+
         xEventGroupClearBits(g_pixel.p_ble_event_group, WIFI_ALL);
         xEventGroupSetBits(g_pixel.p_ble_event_group, WIFI_SCANNING);
 
@@ -106,19 +74,19 @@ static void wifi_event_handler (void *           p_arg,
     }
     else if (IP_EVENT == event_base)
     {
+        xEventGroupClearBits(g_pixel.p_ble_event_group, WIFI_ALL);
+
         if (IP_EVENT_STA_GOT_IP == event_id)
         {
             ip_event_got_ip_t * p_event = (ip_event_got_ip_t *)p_event_data;
             ESP_LOGI(WIFI_TAG,
                      "Got IP: " IPSTR,
                      IP2STR(&((p_event->ip_info).ip)));
-            xEventGroupClearBits(g_pixel.p_ble_event_group, WIFI_ALL);
             xEventGroupSetBits(g_pixel.p_ble_event_group, WIFI_CONNECTED);
         }
         else
         {
             ESP_LOGW(WIFI_TAG, "NOT IMPLEMENTED IP event: %" PRIi32, event_id);
-            xEventGroupClearBits(g_pixel.p_ble_event_group, WIFI_ALL);
         }
     }
     else

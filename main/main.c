@@ -26,8 +26,8 @@ void app_main (void)
 
     // create wifi task
     wifi_init();
-    // create glasses (ble) task
 
+    // create glasses (ble) task
     if (ESP_OK != ble_init())
     {
         ESP_LOGE(MAIN_TAG, "Failed to initialize BLE stack");
@@ -43,8 +43,6 @@ void app_main (void)
     // send response to glasses (ble) task
 
     // send response to device
-
-    // xTaskCreate(ble_host_task, "ble_host_task", 4096, NULL, 10, NULL);
 
 EXIT:
     return;
