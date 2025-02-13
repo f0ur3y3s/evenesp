@@ -3,7 +3,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "host/ble_hs.h"
+
+#include "ble.h"
 
 typedef struct lens_t
 {
@@ -19,5 +20,11 @@ typedef struct glasses_t
     uint8_t seq;
     bool    received_ack;
 } glasses_t;
+
+int glasses_init (void);
+int glasses_deinit (void);
+int glasses_connect (void);
+int glasses_disconnect (void);
+int glasses_send (void);
 
 #endif // EVEN_GLASSES_H

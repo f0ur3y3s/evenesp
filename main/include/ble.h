@@ -13,15 +13,16 @@
 #include "nimble/ble.h"
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
-
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 /* custom headers */
 #include "led.h"
 
 #define BLE_TAG "ble"
 // TODO: Change this to name of devices
-// #define TARGET_DEVICE_NAME "NimBLE_CONN"
-#define LEFT_LENS  "Even G1_1_L_"
-#define RIGHT_LENS "Even G1_1_R_"
+#define TARGET_DEVICE_NAME "NimBLE_CONN"
+#define LEFT_LENS          "Even G1_1_L_"
+#define RIGHT_LENS         "Even G1_1_R_"
 
 /**
  * @brief Initilizes the BLE stack with NimBLE host

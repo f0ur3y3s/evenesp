@@ -36,6 +36,8 @@ esp_err_t ble_init (void)
                  status);
     }
 
+    nimble_port_freertos_init(ble_host_task);
+
     return status;
 }
 
@@ -111,8 +113,12 @@ static int ble_gap_event (struct ble_gap_event * p_event, void * p_arg)
                 return 0;
             }
 
+            // if (NULL
+            //     != strnstr((char *)fields.name, LEFT_LENS, fields.name_len))
             if (NULL
-                != strnstr((char *)fields.name, LEFT_LENS, fields.name_len))
+                != strnstr((char *)fields.name,
+                           TARGET_DEVICE_NAME,
+                           fields.name_len))
             {
                 ESP_LOGI(BLE_TAG,
                          "Discovered device: %.*s",
