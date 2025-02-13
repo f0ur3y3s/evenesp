@@ -9,6 +9,7 @@
 /* Custom headers */
 #include "led.h"
 #include "ble.h"
+#include "wifi.h"
 
 #define MAIN_TAG "main"
 

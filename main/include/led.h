@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "led_strip.h"
 #include "esp_log.h"
+#include <freertos/event_groups.h>
 
 /* Defaults for onboard neopixel */
 #define LED_STRIP_GPIO 48
@@ -11,20 +12,38 @@
 #define MAX_HUE        360
 #define LED_TAG        "LED"
 
-typedef enum group_bits_e
-{
-    BLE_SCANNING   = BIT0,
-    BLE_CONNECTING = BIT1,
-    BLE_CONNECTED  = BIT2,
-    BLE_ALL        = (BIT0 | BIT1 | BIT2)
-} group_bits_e;
-
 typedef struct hsv_t
 {
     uint16_t hue;
     uint8_t  saturation;
     uint8_t  value;
 } hsv_t;
+
+typedef enum group_bits_e
+{
+    BLE_SCANNING    = BIT0,
+    BLE_CONNECTING  = BIT1,
+    BLE_CONNECTED   = BIT2,
+    BLE_ALL         = (BLE_SCANNING | BLE_CONNECTING | BLE_CONNECTED),
+    WIFI_SCANNING   = BIT3,
+    WIFI_CONNECTING = BIT4,
+    WIFI_CONNECTED  = BIT5,
+    WIFI_ALL        = (WIFI_SCANNING | WIFI_CONNECTING | WIFI_CONNECTED),
+    LED_ALL         = (BLE_ALL | WIFI_ALL),
+} group_bits_e;
+
+typedef struct led_status_t
+{
+    struct ble_t
+    {
+        hsv_t status;
+    } ble;
+
+    struct wifi_t
+    {
+        hsv_t status;
+    } wifi;
+} led_status_t;
 
 /**
  * @brief Structure to hold the onboard neopixel handle and event group
@@ -37,6 +56,7 @@ typedef struct pixel_t
     bool               is_initialized;
     EventGroupHandle_t p_ble_event_group;
     led_strip_handle_t p_led_strip;
+    led_status_t       status;
 } pixel_t;
 
 /**

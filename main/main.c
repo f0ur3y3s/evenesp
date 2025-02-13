@@ -21,15 +21,28 @@ void app_main (void)
         }
     }
 
+    // led should track current state of device
     led_init();
 
+    // create wifi task
+    wifi_init();
+
+    // create glasses (ble) task
     if (ESP_OK != ble_init())
     {
         ESP_LOGE(MAIN_TAG, "Failed to initialize BLE stack");
         goto EXIT;
     }
 
-    xTaskCreate(ble_host_task, "ble_host_task", 4096, NULL, 10, NULL);
+    // glasses (ble) wait for data from device
+    // parse data and send to wifi task
+    // wait for response from wifi task
+
+    // wifi send data to api
+    // wait for response from api
+    // send response to glasses (ble) task
+
+    // send response to device
 
 EXIT:
     return;
