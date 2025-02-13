@@ -13,13 +13,27 @@
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
 
-// custom headers
+/* custom headers */
 #include "led.h"
 
-#define BLE_TAG            "ble"
+#define BLE_TAG "ble"
+// TODO: Change this to name of devices
 #define TARGET_DEVICE_NAME "NimBLE_CONN"
-esp_err_t ble_init (pixel_t * p_pixel);
-void      ble_host_config_init (void);
-void      ble_host_task (void * p_param);
+
+/**
+ * @brief Initilizes the BLE stack with NimBLE host
+ *
+ * @return esp_err_t
+ * @retval ESP_OK On success
+ * @retval ESP_FAIL On failure
+ */
+esp_err_t ble_init (void);
+
+/**
+ * @brief xTask function to run the BLE host
+ *
+ * @param p_param Task parameters
+ */
+void ble_host_task (void * p_param);
 
 #endif // EVEN_BLE_H

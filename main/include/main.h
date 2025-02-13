@@ -6,7 +6,7 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 
-// Custom headers
+/* Custom headers */
 #include "led.h"
 #include "ble.h"
 

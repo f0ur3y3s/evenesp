@@ -3,10 +3,13 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "host/ble_hs.h"
 
 typedef struct lens_t
 {
-
+    bool              is_connecting;
+    bool              is_connected;
+    ble_hs_adv_fields fields;
 } lens_t;
 
 typedef struct glasses_t
