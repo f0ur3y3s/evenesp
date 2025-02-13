@@ -3,30 +3,47 @@
 /* Library function declarations */
 void ble_store_config_init (void);
 
-static void ble_host_config_init (void);
-static void ble_on_stack_reset (int reason);
-static void ble_on_stack_sync (void);
-static int  ble_gap_event (struct ble_gap_event * p_event, void * p_arg);
+static void        ble_on_stack_reset (int reason);
+static void        ble_on_stack_sync (void);
+static int         ble_gap_event (struct ble_gap_event * p_event, void * p_arg);
+static void        ble_host_config_init (void);
+static void        print_conn_desc (struct ble_gap_conn_desc * desc);
+inline static void format_addr (char * addr_str, uint8_t addr[]);
+
+static const struct ble_gap_disc_params g_scan_params = {
+    .itvl          = 0x50,
+    .window        = 0x30,
+    .filter_policy = BLE_HCI_SCAN_FILT_NO_WL,
+    .limited       = 0,
+    .passive       = 0 //
+};
+
+static bool g_is_connecting = false;
 
 esp_err_t ble_init (void)
 {
     esp_err_t status = nimble_port_init();
 
-    if (ESP_OK != status)
+    if (ESP_OK == status)
     {
-        ESP_LOGE(BLE_TAG, "Failed to initialize nimble port, error code: %d", status);
-        goto EXIT;
+        ble_host_config_init();
+    }
+    else
+    {
+        ESP_LOGE(BLE_TAG,
+                 "Failed to initialize nimble port, error code: %d",
+                 status);
     }
 
-    ble_host_config_init();
-
-EXIT:
     return status;
 }
 
-// void ble_scan (void)
-// {
-// }
+void ble_host_task (void * p_param)
+{
+    ESP_LOGI(BLE_TAG, "Starting BLE host task");
+    nimble_port_run();
+    vTaskDelete(NULL);
+}
 
 static void ble_host_config_init (void)
 {
@@ -45,116 +62,195 @@ static void ble_on_stack_reset (int reason)
 static void ble_on_stack_sync (void)
 {
     ESP_LOGI(BLE_TAG, "BLE stack synchronized, starting scan...");
-
-    struct ble_gap_disc_params scan_params = {
-        .itvl          = 0x50, // Scan interval
-        .window        = 0x30, // Scan window
-        .filter_policy = BLE_HCI_SCAN_FILT_NO_WL,
-        .limited       = 0, // General discovery mode
-        .passive       = 0  // Active scanning (requests scan responses)
-    };
-
-    int status = ble_gap_disc(BLE_OWN_ADDR_PUBLIC, BLE_HS_FOREVER, &scan_params, ble_gap_event, NULL);
+    xEventGroupClearBits(g_pixel.p_ble_event_group, BLE_ALL);
+    xEventGroupSetBits(g_pixel.p_ble_event_group, BLE_SCANNING);
+    int status = ble_gap_disc(BLE_OWN_ADDR_PUBLIC,
+                              BLE_HS_FOREVER,
+                              &g_scan_params,
+                              ble_gap_event,
+                              NULL);
 
     if (0 != status)
     {
         ESP_LOGE(BLE_TAG, "Failed to start scanning, error code: %d", status);
         vTaskDelete(NULL);
-        goto EXIT;
     }
 
-    //     // while (!(g_lens.found))
-    //     // {
-    //     //     // vTaskDelay(1000 / portTICK_PERIOD_MS);
-    //     //     taskYIELD();
-    //     //     vTaskDelay(pdMS_TO_TICKS(500));
-    //     // }
-
-    //     // ble_gap_disc_cancel();
-
-    //     if (g_lens.found)
-    //     {
-    //         ESP_LOGI(BLE_TAG,
-    //                  "Device found: %s, Addr: %02x:%02x:%02x:%02x:%02x:%02x, RSSI: %d",
-    //                  g_lens.name,
-    //                  g_lens.addr[0],
-    //                  g_lens.addr[1],
-    //                  g_lens.addr[2],
-    //                  g_lens.addr[3],
-    //                  g_lens.addr[4],
-    //                  g_lens.addr[5],
-    //                  g_lens.rssi);
-    //     }
-    //     // ESP_LOGI(BLE_TAG,
-    //     //          "Device found: %s, Addr: %02x:%02x:%02x:%02x:%02x:%02x, RSSI: %d",
-    //     //          g_lens.name,
-    //     //          g_lens.addr[0],
-    //     //          g_lens.addr[1],
-    //     //          g_lens.addr[2],
-    //     //          g_lens.addr[3],
-    //     //          g_lens.addr[4],
-    //     //          g_lens.addr[5],
-    //     //          g_lens.rssi);
-
-    //     // vTaskDelete(NULL);
-
-EXIT:
     return;
 }
 
 static int ble_gap_event (struct ble_gap_event * p_event, void * p_arg)
 {
-    int status = -1;
-
-    if (NULL == p_event)
+    switch (p_event->type)
     {
-        ESP_LOGE(BLE_TAG, "event pointer is null!");
-        goto EXIT;
+        case BLE_GAP_EVENT_DISC: {
+            if (g_is_connecting) // If already connecting, ignore
+            {
+                return 0;
+            }
+
+            struct ble_hs_adv_fields fields = { 0 };
+            int                      status = ble_hs_adv_parse_fields(&fields,
+                                                 p_event->disc.data,
+                                                 (p_event->disc).length_data);
+
+            if (0 != status)
+            {
+                ESP_LOGE(BLE_TAG,
+                         "Failed to parse advertisement data, error code: %d",
+                         status);
+                return 0;
+            }
+
+            if ((0 == fields.name_len) || (NULL == fields.name))
+            {
+                return 0;
+            }
+
+            if (strnstr((char *)fields.name,
+                        TARGET_DEVICE_NAME,
+                        fields.name_len))
+            {
+                ESP_LOGI(BLE_TAG,
+                         "Discovered device: %.*s",
+                         fields.name_len,
+                         fields.name);
+
+                g_is_connecting = true; // Set connecting flag
+                ble_gap_disc_cancel();
+                // clear all bits (portmax will be 16 or 32)
+                xEventGroupClearBits(g_pixel.p_ble_event_group, BLE_ALL);
+                xEventGroupSetBits(g_pixel.p_ble_event_group, BLE_CONNECTING);
+
+                struct ble_gap_conn_params conn_params
+                    = { .scan_itvl           = 0x50,
+                        .scan_window         = 0x30,
+                        .itvl_min            = 0x10,
+                        .itvl_max            = 0x20,
+                        .latency             = 0,
+                        .supervision_timeout = 1000,
+                        .min_ce_len          = 0x10,
+                        .max_ce_len          = 0x20 };
+
+                status = ble_gap_connect(p_event->disc.addr.type,
+                                         &p_event->disc.addr,
+                                         10000,
+                                         &conn_params,
+                                         ble_gap_event,
+                                         NULL);
+
+                if (0 != status)
+                {
+                    ESP_LOGE(BLE_TAG,
+                             "Failed to connect to device, error code: %d",
+                             status);
+                    g_is_connecting = false;
+                }
+            }
+        }
+        break;
+
+        case BLE_GAP_EVENT_DISC_COMPLETE: {
+            ESP_LOGI(BLE_TAG,
+                     "discovery complete, status=%d",
+                     p_event->disc_complete.reason);
+        }
+        break;
+
+        case BLE_GAP_EVENT_CONNECT: {
+            g_is_connecting = false;
+
+            if (0 == (p_event->connect).status)
+            {
+                ESP_LOGI(BLE_TAG, "Successfully connected!");
+                // clear all bits (portmax will be 16 or 32)
+                xEventGroupClearBits(g_pixel.p_ble_event_group, BLE_ALL);
+                xEventGroupSetBits(g_pixel.p_ble_event_group, BLE_CONNECTED);
+            }
+            else
+            {
+                ESP_LOGE(BLE_TAG,
+                         "Connection failed, error: %d",
+                         (p_event->connect).status);
+                ble_gap_disc(BLE_OWN_ADDR_PUBLIC,
+                             BLE_HS_FOREVER,
+                             &g_scan_params,
+                             ble_gap_event,
+                             NULL);
+            }
+        }
+        break;
+
+        case BLE_GAP_EVENT_DISCONNECT: {
+            ESP_LOGI(BLE_TAG,
+                     "disconnected, reason=%d",
+                     p_event->disconnect.reason);
+            // clear all bits (portmax will be 16 or 32)
+            xEventGroupClearBits(g_pixel.p_ble_event_group, BLE_ALL);
+            xEventGroupSetBits(g_pixel.p_ble_event_group, BLE_SCANNING);
+            ble_gap_disc(BLE_OWN_ADDR_PUBLIC,
+                         BLE_HS_FOREVER,
+                         &g_scan_params,
+                         ble_gap_event,
+                         NULL);
+        }
+        break;
+
+        case BLE_GAP_EVENT_CONN_UPDATE: {
+            ESP_LOGI(BLE_TAG,
+                     "connection updated, status=%d",
+                     p_event->conn_update.status);
+        }
+        break;
+        default: {
+        }
+        break;
     }
 
-    struct ble_hs_adv_fields fields = { 0 };
+    return 0;
+}
 
-    if (BLE_GAP_EVENT_DISC == p_event->type)
-    {
-        status = ble_hs_adv_parse_fields(&fields, (p_event->disc).data, (p_event->disc).length_data);
+inline static void format_addr (char * addr_str, uint8_t addr[])
+{
+    sprintf(addr_str,
+            "%02X:%02X:%02X:%02X:%02X:%02X",
+            addr[0],
+            addr[1],
+            addr[2],
+            addr[3],
+            addr[4],
+            addr[5]);
+}
 
-        if (0 != status)
-        {
-            ESP_LOGE(BLE_TAG, "failed to parse advertisement data, error code: %d", status);
-            goto EXIT;
-        }
+static void print_conn_desc (struct ble_gap_conn_desc * desc)
+{
+    char addr_str[18] = { 0 };
 
-        if ((0 == fields.name_len) || (NULL == fields.name))
-        {
-            goto EXIT;
-        }
+    /* Connection handle */
+    ESP_LOGI(BLE_TAG, "connection handle: %d", desc->conn_handle);
 
-        ESP_LOGD(BLE_TAG, "Device found: %s", fields.name);
+    /* Local ID address */
+    format_addr(addr_str, desc->our_id_addr.val);
+    ESP_LOGI(BLE_TAG,
+             "device id address: type=%d, value=%s",
+             desc->our_id_addr.type,
+             addr_str);
 
-        // char device_name[32] = { 0 }; // Buffer to store device name
-        // memcpy(device_name, fields.name, fields.name_len);
-        // device_name[fields.name_len] = '\0'; // Null-terminate the string
+    /* Peer ID address */
+    format_addr(addr_str, desc->peer_id_addr.val);
+    ESP_LOGI(BLE_TAG,
+             "peer id address: type=%d, value=%s",
+             desc->peer_id_addr.type,
+             addr_str);
 
-        // if (strstr(device_name, "Even") && strstr(device_name, "_L_"))
-        // {
-        //     memcpy(p_lens->name, device_name, fields.name_len);
-        //     memcpy(p_lens->addr, (p_event->disc).addr.val, 6);
-        //     p_lens->rssi  = (p_event->disc).rssi;
-        //     p_lens->found = true;
-        //     status        = 0;
-        //     ESP_LOGI(BLE_TAG,
-        //              "Device found: %s, Addr: %02x:%02x:%02x:%02x:%02x:%02x, RSSI: %d",
-        //              g_lens.name,
-        //              g_lens.addr[0],
-        //              g_lens.addr[1],
-        //              g_lens.addr[2],
-        //              g_lens.addr[3],
-        //              g_lens.addr[4],
-        //              g_lens.addr[5],
-        //              g_lens.rssi);
-        // }
-    }
-
-EXIT:
-    return status;
+    /* Connection info */
+    ESP_LOGI(BLE_TAG,
+             "conn_itvl=%d, conn_latency=%d, supervision_timeout=%d, "
+             "encrypted=%d, authenticated=%d, bonded=%d\n",
+             desc->conn_itvl,
+             desc->conn_latency,
+             desc->supervision_timeout,
+             desc->sec_state.encrypted,
+             desc->sec_state.authenticated,
+             desc->sec_state.bonded);
 }
